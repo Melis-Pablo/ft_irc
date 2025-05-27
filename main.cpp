@@ -1,15 +1,24 @@
-#include "srcs/ext_f.hpp"
+#include "Server.hpp"
+#include <iostream>
 
-// ./ircserv <Port> <Password>
-// Port: Listening port
-// Password: Server password
 int main(int ac, char **av)
 {
     if (ac != 3)
     {
-        std::cerr << "Usage: " << av[0] << " <Port> <Password>" << std::endl;
+        std::cerr << "Usage: " << av[0] << " <port> <password>" << std::endl;
         return 1;
     }
-    // run_server(av[1], av[2]);
+
+    try
+    {
+        Server server(av[1], av[2]);
+        server.run();
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
     return 0;
 }

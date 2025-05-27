@@ -1,5 +1,5 @@
-#ifndef EXT_F_HPP
-#define EXT_F_HPP
+#ifndef ALLOWED_HPP
+#define ALLOWED_HPP
 
 #include <sys/socket.h> // socket, setsockopt, getsockname, bind, connect, listen, accept
 #include <unistd.h> // close, lseek
@@ -9,7 +9,7 @@
 #include <csignal> // signal, sigaction
 #include <sys/stat.h> // fstat
 #include <fcntl.h> // fcntl
-#include <poll.h> // poll (or equivalent)
+#include <poll.h> // poll (or equivalent [select(), kqueue(), or epoll()])
 #include <sys/types.h> // recv, send
 
 // Also Everything in C++ 98.

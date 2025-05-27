@@ -1,15 +1,18 @@
 # General Setup
 NAME = ircserv
 CC = c++
-FLAGS = -Wall -Wextra -Werror -std=c++98
+FLAGS = -Wall -Wextra -Werror -std=c++98 -I$(HEADERS_DIR)
 RM = rm -rf
 
 # Files
-FILES = main
-HEADERS = 
-SRCS = $(FILES:=.cpp)
+FILES = Server IRCMessage Client
+HEADERS = Allowed.hpp Server.hpp IRCMessage.hpp Client.hpp
+SRCS_DIR = srcs
+HEADERS_DIR = include
+SRCS = main.cpp $(addprefix $(SRCS_DIR)/, $(FILES:=.cpp))
 OBJDIR = .objs
-OBJS = $(addprefix $(OBJDIR)/, $(FILES:=.o))
+OBJS = $(OBJDIR)/main.o $(addprefix $(OBJDIR)/, $(FILES:=.o))
+HEADER_FILES = $(addprefix $(HEADERS_DIR)/, $(HEADERS))
 
 # Colors
 GREEN		=	\e[92;5;118m
@@ -21,11 +24,16 @@ RESET		=	\e[0m
 # Rules
 all: $(NAME)
 
-$(NAME): $(OBJS) $(HEADERS)
+$(NAME): $(OBJS) $(HEADER_FILES)
 	@$(CC) $(FLAGS) $(OBJS) -o $(NAME)
 	@printf "$(GREEN) $(NAME) $(RESET) has been created.\n"
 
-$(OBJDIR)/%.o: %.cpp $(HEADERS)
+$(OBJDIR)/main.o: main.cpp $(HEADER_FILES)
+	@mkdir -p $(OBJDIR)
+	@$(CC) $(FLAGS) -c $< -o $@
+	@printf "$(YELLOW) Compiling: $(RESET) $< \n"
+
+$(OBJDIR)/%.o: $(SRCS_DIR)/%.cpp $(HEADER_FILES)
 	@mkdir -p $(OBJDIR)
 	@$(CC) $(FLAGS) -c $< -o $@
 	@printf "$(YELLOW) Compiling: $(RESET) $< \n"
