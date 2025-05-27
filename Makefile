@@ -5,8 +5,8 @@ FLAGS = -Wall -Wextra -Werror -std=c++98 -I$(HEADERS_DIR)
 RM = rm -rf
 
 # Files
-FILES = Server IRCMessage Client
-HEADERS = Allowed.hpp Server.hpp IRCMessage.hpp Client.hpp
+FILES = Server IRCMessage Client Channel
+HEADERS = Allowed.hpp Server.hpp IRCMessage.hpp Client.hpp Channel.hpp
 SRCS_DIR = srcs
 HEADERS_DIR = include
 SRCS = main.cpp $(addprefix $(SRCS_DIR)/, $(FILES:=.cpp))
