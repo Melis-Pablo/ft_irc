@@ -1,5 +1,9 @@
 #include "IRCMessage.hpp"
 
+IRCMessage::IRCMessage() : prefix(""), command(""), trailing("") {}
+
+IRCMessage::~IRCMessage() {}
+
 IRCMessage parseMessage(const std::string& raw_message) {
     IRCMessage msg;
     std::string line = raw_message;
@@ -56,16 +60,4 @@ IRCMessage parseMessage(const std::string& raw_message) {
     }
     
     return msg;
-}
-
-void IRCMessage::print_debug() {
-        std::cout << "Prefix: '" << prefix << "'" << std::endl;
-        std::cout << "Command: '" << command << "'" << std::endl;
-        std::cout << "Params: ";
-        for(size_t i = 0; i < params.size(); i++) {
-            std::cout << "'" << params[i] << "'";
-            if(i < params.size() - 1) std::cout << ", ";
-        }
-        std::cout << std::endl;
-        std::cout << "Trailing: '" << trailing << "'" << std::endl;
 }

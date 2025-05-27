@@ -19,3 +19,7 @@ void Client::leaveChannel(const std::string& channel_name) {
 bool Client::isInChannel(const std::string& channel_name) const {
     return channels.find(channel_name) != channels.end();
 }
+
+const std::set<std::string>& Client::getChannels() const {
+    return channels;
+}

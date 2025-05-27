@@ -1,14 +1,9 @@
 #include "Channel.hpp"
-#include <sstream>
 
-Channel::Channel() 
-    : name(""), topic(""), key(""), invite_only(false), 
-      topic_restricted(false), has_key(false), has_user_limit(false), user_limit(0) {
+Channel::Channel() : name(""), topic(""), key(""), invite_only(false), topic_restricted(false), has_key(false), has_user_limit(false), user_limit(0) {
 }
 
-Channel::Channel(const std::string& channel_name) 
-    : name(channel_name), topic(""), key(""), invite_only(false), 
-      topic_restricted(false), has_key(false), has_user_limit(false), user_limit(0) {
+Channel::Channel(const std::string& channel_name) : name(channel_name), topic(""), key(""), invite_only(false), topic_restricted(false), has_key(false), has_user_limit(false), user_limit(0) {
 }
 
 Channel::~Channel() {

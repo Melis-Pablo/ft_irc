@@ -1,20 +1,22 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include <vector>
-#include <map>
-#include <string>
-#include <iostream>
-#include <cstring>
-#include <cstdlib>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <stdexcept>
-#include <sstream>
-#include <cctype>
-#include <utility>
+#include <vector> // For std::vector
+#include <map> // For std::map
+#include <string> // For std::string
+#include <iostream> // For std::cout
+#include <cstring> // For std::strerror
+#include <cstdlib> // For std::atoi
+#include <unistd.h> // For close()
+#include <arpa/inet.h> // For inet_pton, sockaddr_in
+#include <sys/socket.h> // For socket functions
+#include <sys/select.h> // For select()
+#include <stdexcept> // For std::runtime_error
+#include <sstream> // For std::istringstream
+#include <cctype> // For std::isdigit
+#include <utility> // For std::pair
+#include <errno.h> // For errno
+#include "Allowed.hpp"
 #include "Client.hpp"
 #include "IRCMessage.hpp"
 #include "Channel.hpp"
@@ -66,6 +68,8 @@ private:
     int findClientByNickname(const std::string& nickname);
     void removeClientFromAllChannels(int client_index);
     void cleanupEmptyChannels();
+
+    void handleWhois(int client_index, const IRCMessage& msg);
 
 public:
     Server(const std::string& port_str, const std::string& pass);

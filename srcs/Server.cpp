@@ -36,6 +36,13 @@ void Server::setupSocket() {
         throw std::runtime_error("socket creation failed");
     }
 
+    // Set socket to non-blocking mode - CRITICAL FIX
+    if (fcntl(server_fd, F_SETFL, O_NONBLOCK) < 0)
+    {
+        close(server_fd);
+        throw std::runtime_error("fcntl failed to set non-blocking");
+    }
+
     // Allow socket reuse
     int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
@@ -74,7 +81,17 @@ void Server::acceptNewClient() {
     
     if (client_fd < 0)
     {
-        perror("accept");
+        // In non-blocking mode, EAGAIN/EWOULDBLOCK is normal when no connection is pending
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            perror("accept");
+        return;
+    }
+
+    // Set client socket to non-blocking mode - CRITICAL FIX
+    if (fcntl(client_fd, F_SETFL, O_NONBLOCK) < 0)
+    {
+        perror("fcntl failed for client socket");
+        close(client_fd);
         return;
     }
 
@@ -98,7 +115,20 @@ void Server::handleClientMessage(int client_index) {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_recv = recv(clients[client_index].fd, buffer, BUFFER_SIZE - 1, 0);
 
-    if (bytes_recv <= 0)
+    if (bytes_recv < 0)
+    {
+        // In non-blocking mode, EAGAIN/EWOULDBLOCK means no data available right now
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return; // This is normal, just return and try again later
+        
+        // Any other error means connection problem
+        perror("recv");
+        std::cout << "Client " << clients[client_index].fd << " disconnected due to error" << std::endl;
+        removeClient(client_index);
+        return;
+    }
+    
+    if (bytes_recv == 0)
     {
         std::cout << "Client " << clients[client_index].fd << " disconnected" << std::endl;
         removeClient(client_index);
@@ -122,6 +152,34 @@ void Server::handleClientMessage(int client_index) {
             handleIRCMessage(client_index, parsed_msg);
         }
     }
+}
+
+// Implement the handler:
+void Server::handleWhois(int client_index, const IRCMessage& msg) {
+    if (!clients[client_index].isFullyRegistered()) {
+        sendMessage(clients[client_index].fd, "451 * :You have not registered");
+        return;
+    }
+
+    if (msg.params.empty()) {
+        sendMessage(clients[client_index].fd, "431 " + clients[client_index].nickname + " :No nickname given");
+        return;
+    }
+
+    std::string target_nick = msg.params[0];
+    int target_index = findClientByNickname(target_nick);
+    
+    if (target_index == -1) {
+        sendMessage(clients[client_index].fd, "401 " + clients[client_index].nickname + " " + target_nick + " :No such nick");
+        sendMessage(clients[client_index].fd, "318 " + clients[client_index].nickname + " " + target_nick + " :End of WHOIS list");
+        return;
+    }
+
+    const Client& target = clients[target_index];
+    
+    // Send WHOIS information
+    sendMessage(clients[client_index].fd, "311 " + clients[client_index].nickname + " " + target.nickname + " " + target.username + " " + target.hostname + " * :" + target.realname);
+    sendMessage(clients[client_index].fd, "318 " + clients[client_index].nickname + " " + target.nickname + " :End of WHOIS list");
 }
 
 void Server::handleIRCMessage(int client_index, const IRCMessage& msg) {
@@ -159,6 +217,8 @@ void Server::handleIRCMessage(int client_index, const IRCMessage& msg) {
         handleTopic(client_index, msg);
     } else if (cmd == "MODE") {
         handleMode(client_index, msg);
+    } else if (cmd == "WHOIS") {
+        handleWhois(client_index, msg);
     } else {
         // Unknown command
         if (clients[client_index].isFullyRegistered()) {
@@ -193,6 +253,12 @@ void Server::handleNick(int client_index, const IRCMessage& msg) {
         return;
     }
 
+    // Check if client provided password first
+    if (!clients[client_index].authenticated) {
+        sendMessage(clients[client_index].fd, "464 * :Password incorrect");
+        return;
+    }
+
     std::string new_nick = msg.params[0];
     
     // Check if nickname is already in use
@@ -220,6 +286,12 @@ void Server::handleNick(int client_index, const IRCMessage& msg) {
 void Server::handleUser(int client_index, const IRCMessage& msg) {
     if (msg.params.size() < 3 || msg.trailing.empty()) {
         sendMessage(clients[client_index].fd, "461 * USER :Not enough parameters");
+        return;
+    }
+
+    // Check if client provided password first
+    if (!clients[client_index].authenticated) {
+        sendMessage(clients[client_index].fd, "464 * :Password incorrect");
         return;
     }
 
@@ -710,7 +782,12 @@ void Server::handleMode(int client_index, const IRCMessage& msg) {
 
 void Server::sendMessage(int client_fd, const std::string& message) {
     std::string full_message = message + "\r\n";
-    send(client_fd, full_message.c_str(), full_message.length(), 0);
+    ssize_t bytes_sent = send(client_fd, full_message.c_str(), full_message.length(), 0);
+    if (bytes_sent < 0) {
+        perror("send");
+    }
+    // Add flush to ensure immediate sending
+    fsync(client_fd);
 }
 
 void Server::sendWelcomeMessages(int client_index) {
@@ -815,41 +892,49 @@ void Server::removeClient(int client_index) {
 }
 
 void Server::run() {
-    while (true)
-    {
-        fd_set read_fds;
-        FD_ZERO(&read_fds);
-        FD_SET(server_fd, &read_fds);
-        int max_fd = server_fd;
-
-        // Add all client file descriptors to the set
-        for (size_t j = 0; j < clients.size(); j++)
-        {
-            FD_SET(clients[j].fd, &read_fds);
-            if (clients[j].fd > max_fd)
-                max_fd = clients[j].fd;
+    std::vector<struct pollfd> poll_fds;
+    
+    while (true) {
+        poll_fds.clear();
+        
+        // Add server socket
+        struct pollfd server_pollfd;
+        server_pollfd.fd = server_fd;
+        server_pollfd.events = POLLIN;
+        server_pollfd.revents = 0;
+        poll_fds.push_back(server_pollfd);
+        
+        // Add client sockets
+        for (size_t i = 0; i < clients.size(); i++) {
+            struct pollfd client_pollfd;
+            client_pollfd.fd = clients[i].fd;
+            client_pollfd.events = POLLIN;
+            client_pollfd.revents = 0;
+            poll_fds.push_back(client_pollfd);
         }
-
-        // Wait for activity on any of the file descriptors
-        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) < 0)
-        {
-            perror("select");
+        
+        // Poll for events
+        int poll_result = poll(&poll_fds[0], poll_fds.size(), -1);
+        if (poll_result < 0) {
+            perror("poll");
             break;
         }
-
-        // Check if there's a new connection
-        if (FD_ISSET(server_fd, &read_fds))
-        {
+        
+        // Check server socket for new connections
+        if (poll_fds[0].revents & POLLIN) {
             acceptNewClient();
         }
-
-        // Check all clients for incoming messages
-        // Note: iterate backwards to safely remove clients during iteration
-        for (int i = static_cast<int>(clients.size()) - 1; i >= 0; i--)
-        {
-            if (FD_ISSET(clients[i].fd, &read_fds))
-            {
-                handleClientMessage(i);
+        
+        // Check client sockets for messages
+        for (size_t i = 1; i < poll_fds.size(); i++) {
+            if (poll_fds[i].revents & POLLIN) {
+                // Find client index by fd
+                for (int j = static_cast<int>(clients.size()) - 1; j >= 0; j--) {
+                    if (clients[j].fd == poll_fds[i].fd) {
+                        handleClientMessage(j);
+                        break;
+                    }
+                }
             }
         }
     }

@@ -5,14 +5,18 @@ FLAGS = -Wall -Wextra -Werror -std=c++98 -I$(HEADERS_DIR)
 RM = rm -rf
 
 # Files
-FILES = Server IRCMessage Client Channel
-HEADERS = Allowed.hpp Server.hpp IRCMessage.hpp Client.hpp Channel.hpp
+FILES = main Server IRCMessage Client Channel
+HEADERS = Allowed Server IRCMessage Client Channel
+
+# Directories
 SRCS_DIR = srcs
 HEADERS_DIR = include
-SRCS = main.cpp $(addprefix $(SRCS_DIR)/, $(FILES:=.cpp))
 OBJDIR = .objs
-OBJS = $(OBJDIR)/main.o $(addprefix $(OBJDIR)/, $(FILES:=.o))
-HEADER_FILES = $(addprefix $(HEADERS_DIR)/, $(HEADERS))
+
+# Auto-generated paths
+SRCS = $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES)))
+OBJS = $(addprefix $(OBJDIR)/, $(addsuffix .o, $(FILES)))
+HEADER_FILES = $(addprefix $(HEADERS_DIR)/, $(addsuffix .hpp, $(HEADERS)))
 
 # Colors
 GREEN		=	\e[92;5;118m
@@ -27,11 +31,6 @@ all: $(NAME)
 $(NAME): $(OBJS) $(HEADER_FILES)
 	@$(CC) $(FLAGS) $(OBJS) -o $(NAME)
 	@printf "$(GREEN) $(NAME) $(RESET) has been created.\n"
-
-$(OBJDIR)/main.o: main.cpp $(HEADER_FILES)
-	@mkdir -p $(OBJDIR)
-	@$(CC) $(FLAGS) -c $< -o $@
-	@printf "$(YELLOW) Compiling: $(RESET) $< \n"
 
 $(OBJDIR)/%.o: $(SRCS_DIR)/%.cpp $(HEADER_FILES)
 	@mkdir -p $(OBJDIR)
