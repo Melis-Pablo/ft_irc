@@ -5,8 +5,8 @@ FLAGS = -Wall -Wextra -Werror -std=c++98 -I$(HEADERS_DIR)
 RM = rm -rf
 
 # Files
-FILES = main Server IRCMessage Client Channel
-HEADERS = Allowed Server IRCMessage Client Channel
+FILES = main Server IRCMessage Client Channel CommandHandler
+HEADERS = Server IRCMessage Client Channel CommandHandler
 
 # Directories
 SRCS_DIR = srcs
